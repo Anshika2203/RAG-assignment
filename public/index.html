@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .upload-section, .query-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            margin-right: 1rem;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .file-input-button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .file-input-button:hover {
+            background: #45a049;
+        }
+
+        .upload-button, .query-button {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .upload-button:hover, .query-button:hover {
+            background: #1976D2;
+        }
+
+        .query-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-bottom: 1rem;
+        }
+
+        .query-input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+
+        .results-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .answer-box {
+            background: #e8f5e8;
+            border-left: 4px solid #4CAF50;
+            padding: 1.5rem;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+        }
+
+        .chunks-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-top: 2rem;
+        }
+
+        .chunk-list {
+            background: #f9f9f9;
+            padding: 1.5rem;
+            border-radius: 5px;
+        }
+
+        .chunk-item {
+            background: white;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 5px;
+            border-left: 4px solid #ddd;
+        }
+
+        .chunk-item.selected {
+            border-left-color: #FF9800;
+            background: #fff3e0;
+        }
+
+        .chunk-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .similarity-score {
+            background: #2196F3;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+        }
+
+        .final-score {
+            background: #FF9800;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+
+        .chunk-text {
+            font-size: 14px;
+            line-height: 1.4;
+            max-height: 100px;
+            overflow-y: auto;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 1rem;
+            border-radius: 5px;
+            margin: 1rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .chunks-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 RAG System</h1>
+            <p>Upload documents and ask questions about their content</p>
+        </div>
+
+        <div class="upload-section">
+            <h2>📄 Upload Document</h2>
+            <div style="margin-top: 1rem;">
+                <div class="file-input-wrapper">
+                    <input type="file" id="fileInput" class="file-input" accept=".pdf">
+                    <button class="file-input-button" onclick="document.getElementById('fileInput').click()">
+                        Choose PDF File
+                    </button>
+                </div>
+                <button class="upload-button" onclick="uploadDocument()">Upload & Process</button>
+                <span id="selectedFile" style="margin-left: 1rem; color: #666;"></span>
+            </div>
+            <div id="uploadStatus"></div>
+        </div>
+
+        <div class="query-section">
+            <h2>❓ Ask Questions</h2>
+            <div style="margin-top: 1rem;">
+                <input type="text" id="queryInput" class="query-input" 
+                       placeholder="Ask a question about the uploaded document..." 
+                       onkeypress="handleKeyPress(event)">
+                <button class="query-button" onclick="submitQuery()">Search</button>
+            </div>
+        </div>
+
+        <div id="resultsSection" class="results-section" style="display: none;">
+            <h2>📊 Results</h2>
+            
+            <div id="answerSection">
+                <h3>Answer:</h3>
+                <div id="answerBox" class="answer-box"></div>
+            </div>
+
+            <div class="chunks-grid">
+                <div class="chunk-list">
+                    <h3>🔍 All Retrieved Chunks (Similarity Search)</h3>
+                    <p style="font-size: 14px; color: #666; margin-bottom: 1rem;">
+                        Chunks retrieved from vector similarity search, ranked by cosine similarity
+                    </p>
+                    <div id="allChunksList"></div>
+                </div>
+
+                <div class="chunk-list">
+                    <h3>⭐ Selected Chunks (Re-ranked & Used for Answer)</h3>
+                    <p style="font-size: 14px; color: #666; margin-bottom: 1rem;">
+                        Top chunks after re-ranking, sent to LLM for answer generation
+                    </p>
+                    <div id="selectedChunksList"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loadingIndicator" class="loading" style="display: none;">
+            Processing your request...
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const selectedFileSpan = document.getElementById('selectedFile');
+            
+            if (file) {
+                selectedFileSpan.textContent = `Selected: ${file.name}`;
+            } else {
+                selectedFileSpan.textContent = '';
+            }
+        });
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                submitQuery();
+            }
+        }
+
+        async function uploadDocument() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files[0]) {
+                statusDiv.innerHTML = '<div class="error">Please select a PDF file first.</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('document', fileInput.files[0]);
+
+            statusDiv.innerHTML = '<div class="loading">Uploading and processing document...</div>';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    statusDiv.innerHTML = `<div class="success">Document processed successfully! Created ${result.chunksCount} chunks.</div>`;
+                    fileInput.value = '';
+                    document.getElementById('selectedFile').textContent = '';
+                } else {
+                    statusDiv.innerHTML = `<div class="error">Error: ${result.error}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="error">Upload failed: ${error.message}</div>`;
+            }
+        }
+
+        async function submitQuery() {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                alert('Please enter a question.');
+                return;
+            }
+
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            const resultsSection = document.getElementById('resultsSection');
+            
+            loadingIndicator.style.display = 'block';
+            resultsSection.style.display = 'none';
+
+            try {
+                const response = await fetch('/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    displayResults(result);
+                    resultsSection.style.display = 'block';
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Query failed: ${error.message}`);
+            } finally {
+                loadingIndicator.style.display = 'none';
+            }
+        }
+
+        function displayResults(result) {
+            document.getElementById('answerBox').innerHTML = 
+                `<strong>Q:</strong> ${result.query}<br><br><strong>A:</strong> ${result.answer}`;
+
+            const allChunksList = document.getElementById('allChunksList');
+            allChunksList.innerHTML = '';
+            
+            result.allChunks.forEach((chunk, index) => {
+                const chunkDiv = document.createElement('div');
+                chunkDiv.className = 'chunk-item';
+                chunkDiv.innerHTML = `
+                    <div class="chunk-header">
+                        <span>Chunk #${chunk.chunk_index} from ${chunk.filename}</span>
+                        <span class="similarity-score">Similarity: ${chunk.similarity_score}</span>
+                    </div>
+                    <div class="chunk-text">${chunk.text}</div>
+                `;
+                allChunksList.appendChild(chunkDiv);
+            });
+
+            const selectedChunksList = document.getElementById('selectedChunksList');
+            selectedChunksList.innerHTML = '';
+            
+            result.selectedChunks.forEach((chunk, index) => {
+                const chunkDiv = document.createElement('div');
+                chunkDiv.className = 'chunk-item selected';
+                chunkDiv.innerHTML = `
+                    <div class="chunk-header">
+                        <span>Chunk #${chunk.chunk_index} from ${chunk.filename}</span>
+                        <div>
+                            <span class="similarity-score">Sim: ${chunk.similarity_score}</span>
+                            <span class="final-score">Final: ${chunk.final_score}</span>
+                        </div>
+                    </div>
+                    <div class="chunk-text">${chunk.text}</div>
+                `;
+                selectedChunksList.appendChild(chunkDiv);
+            });
+        }
+    </script>
+</body>
+</html>
